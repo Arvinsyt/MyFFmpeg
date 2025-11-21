@@ -1,0 +1,9 @@
+# Logs
+logs
+*.log
+
+# Packages
+node_modules
+
+# Editor directories and files
+.vscode

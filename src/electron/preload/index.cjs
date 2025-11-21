@@ -1,0 +1,17 @@
+const { contextBridge, ipcRenderer } = require('electron')
+
+// 在预加载脚本中暴露安全的 API 到渲染进程（仅包含有限的 IPC 调用）
+contextBridge.exposeInMainWorld('electronAPI', {
+    // 打开文件对话，返回选中文件路径或 null
+    openFile: () => ipcRenderer.invoke('dialog:openFile'),
+    // 启动 ffmpeg 任务（输入/输出等参数）
+    runFFmpeg: (opts) => ipcRenderer.invoke('run-ffmpeg', opts),
+    // 订阅来自主进程的日志消息
+    onLog: (cb) => ipcRenderer.on('ffmpeg-log', (event, data) => cb(data)),
+    // 订阅进度事件 (percent, outMs, kv, duration)
+    onProgress: (cb) => ipcRenderer.on('ffmpeg-progress', (event, data) => cb(data)),
+    // 订阅转换完成事件
+    onDone: (cb) => ipcRenderer.on('ffmpeg-done', (event, data) => cb(data)),
+    // 订阅错误事件
+    onError: (cb) => ipcRenderer.on('ffmpeg-error', (event, data) => cb(data))
+})
