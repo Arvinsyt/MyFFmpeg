@@ -1,11 +1,9 @@
 # MyFFmpeg
-
 一个基于 Electron + Vite 的桌面多媒体转换工具前端骨架，便于使用 FFmpeg 执行音视频转码、封装和简单编辑任务。
 
-**说明（个人项目）**：本项目为个人学习/演示用途，非商业产品。源码仅供参考，使用 FFmpeg 时请遵守其许可协议及相关法律法规。
 
-**主要特性**
-- [x] **Electron + Vite**: 使用 `Electron` 作为桌面容器、`Vite` 做前端构建，快速热重载开发流程。
+#### **主要特性**
+- [x] **Electron + Vite**: 使用 Electron 作为桌面容器、Vite 做前端构建，快速热重载开发流程。
 - [x] **易扩展的架构**: 将 Electron 主进程、Preload 脚本和渲染进程分离，便于后续增加 API、权限控制或插件系统。
 - [ ] **进度与日志**: 实时显示转换进度、输出日志与错误信息，便于调试与用户反馈。
 - [ ] **内置 FFmpeg 二进制管理**：提供自动下载或内置 FFmpeg 二进制，简化用户配置。
@@ -16,19 +14,23 @@
 - [ ] **并发与资源控制**：支持多任务并发、CPU/GPU 加速选择与优先级控制。
 - [ ] **跨平台**: 目标支持 Windows、macOS 和 Linux（运行时依赖系统上的 FFmpeg）。
 
-**快速开始（开发）**
+#### **快速开始（开发）**
 在项目根目录下运行（Windows PowerShell）：
 ```powershell
 npm install
 npm run dev
 ```
-
 - **常见命令**:
   - `npm run dev`：启动开发模式（Vite + Electron 热重载，视项目脚本而定）。
   - `npm run build`：构建生产包（根据项目配置可能需要额外的打包脚本）。
 
-**项目结构（关键文件）**
+
+#### **项目结构（关键文件）**
 - `src/electron/main/index.cjs`：Electron 主进程入口，管理窗口与原生集成。
 - `src/preload/index.cjs`：Preload 脚本，安全地在渲染进程暴露受限 API。
 - `src/renderer/App.vue`：前端应用主组件。
 - `package.json`：项目脚本与依赖声明。
+
+
+#### **说明（个人项目）**：
+本项目为个人学习/演示用途，非商业产品。源码仅供参考，使用 FFmpeg 时请遵守其许可协议及相关法律法规。
