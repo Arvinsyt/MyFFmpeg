@@ -41,6 +41,33 @@ ipcMain.handle('dialog:openFile', async () => {
     return filePaths[0]
 })
 
+// 使用 ffprobe 获取媒体元信息（JSON）
+ipcMain.handle('probe-video', async (event, filePath) => {
+    return new Promise((res) => {
+        if (!filePath) return res({ success: false, error: 'no file' })
+        try {
+            const args = ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filePath]
+            const p = spawn('ffprobe', args)
+            let out = ''
+            let err = ''
+            p.stdout.on('data', (d) => { out += d.toString() })
+            p.stderr.on('data', (d) => { err += d.toString() })
+            p.on('close', (code) => {
+                if (code === 0) {
+                    try {
+                        const json = JSON.parse(out || '{}')
+                        return res({ success: true, data: json })
+                    } catch (e) {
+                        return res({ success: false, error: 'parse_failed', raw: out })
+                    }
+                }
+                return res({ success: false, error: 'ffprobe_failed', code, stderr: err })
+            })
+            p.on('error', (e) => res({ success: false, error: e && e.message ? e.message : String(e) }))
+        } catch (e) { res({ success: false, error: e && e.message ? e.message : String(e) }) }
+    })
+})
+
 // 通过 spawn 运行 ffmpeg，并将日志回传给渲染进程
 ipcMain.handle('run-ffmpeg', (event, args) => {
     return new Promise(async (resolve) => {

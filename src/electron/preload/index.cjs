@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openFile: () => ipcRenderer.invoke('dialog:openFile'),
     // 启动 ffmpeg 任务（输入/输出等参数）
     runFFmpeg: (opts) => ipcRenderer.invoke('run-ffmpeg', opts),
+    // 获取视频/音频元信息（ffprobe 输出 JSON）
+    getMetadata: (filePath) => ipcRenderer.invoke('probe-video', filePath),
     // 订阅来自主进程的日志消息
     onLog: (cb) => ipcRenderer.on('ffmpeg-log', (event, data) => cb(data)),
     // 订阅进度事件 (percent, outMs, kv, duration)

@@ -2,6 +2,37 @@
 import { ref, onMounted, computed } from 'vue'
 import { useTheme } from 'vuetify'
 
+// 当前选中的 Tab：0 = 信息, 1 = 转换
+const selectedTab = ref(0)
+
+// 信息页状态
+const infoFile = ref('')
+const metadata = ref(null)
+const probing = ref(false)
+const showRaw = ref(false)
+
+// （已移除格式化摘要和流解析相关的辅助计算与函数，信息页仅显示原始 JSON）
+
+function chooseInfoFile() {
+  if (!window.electronAPI) return
+  window.electronAPI.openFile().then((p) => {
+    if (p) infoFile.value = p
+  })
+}
+
+async function probeFile() {
+  if (!infoFile.value) return alert('请选择要查询的文件')
+  if (!window.electronAPI || !window.electronAPI.getMetadata) return alert('元信息功能不可用')
+  probing.value = true
+  metadata.value = null
+  try {
+    const res = await window.electronAPI.getMetadata(infoFile.value)
+    metadata.value = res
+  } catch (e) {
+    metadata.value = { success: false, error: e && e.message ? e.message : String(e) }
+  } finally { probing.value = false }
+}
+
 const inputPath = ref('')
 const outputPath = ref('')
 const format = ref('mp4')
@@ -63,6 +94,70 @@ function humanSize(bytes) {
   return val.toFixed(2) + ' ' + units[i]
 }
 
+function secsToHMS(sec) {
+  if (sec == null || isNaN(Number(sec))) return ''
+  const s = Math.floor(Number(sec))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  if (h > 0) return `${h}h ${m}m ${ss}s`
+  if (m > 0) return `${m}m ${ss}s`
+  return `${ss}s`
+}
+
+const displayItems = computed(() => {
+  if (!metadata || !metadata.value || !metadata.value.success || !metadata.value.data) return []
+  const d = metadata.value.data || {}
+  const fmt = d.format || {}
+  const streams = Array.isArray(d.streams) ? d.streams : []
+
+  const items = []
+
+  // 基本格式信息
+  if (fmt.format_name) items.push({ k: '格式', v: String(fmt.format_name) })
+  if (fmt.duration) items.push({ k: '时长', v: secsToHMS(fmt.duration) })
+  if (fmt.size) items.push({ k: '文件大小', v: humanSize(fmt.size) })
+  if (fmt.bit_rate) {
+    const kb = Math.round(Number(fmt.bit_rate) / 1000)
+    items.push({ k: '总比特率', v: `${kb} kb/s` })
+  }
+  // Tags（如标题、作者）
+  const tags = fmt.tags || {}
+  if (tags.title) items.push({ k: '标题', v: tags.title })
+  if (tags.artist) items.push({ k: '作者', v: tags.artist })
+
+  // 视频流（首个 video）
+  const vstream = streams.find(s => s.codec_type === 'video')
+  if (vstream) {
+    const res = vstream.width && vstream.height ? `${vstream.width}x${vstream.height}` : ''
+    const codec = vstream.codec_name || ''
+    const fps = vstream.avg_frame_rate && vstream.avg_frame_rate !== '0/0' ? (function(){
+      try { const parts = String(vstream.avg_frame_rate).split('/'); return (Number(parts[0]) / Number(parts[1])) || null } catch (e) { return null }
+    })() : null
+    const fpsText = fps ? `${Number(fps).toFixed(2)} fps` : ''
+    const videoParts = [codec, res, fpsText].filter(x => x)
+    if (videoParts.length) items.push({ k: '视频', v: videoParts.join(' · ') })
+  }
+
+  // 音频流（首个 audio）
+  const astream = streams.find(s => s.codec_type === 'audio')
+  if (astream) {
+    const codec = astream.codec_name || ''
+    const sr = astream.sample_rate ? `${astream.sample_rate} Hz` : ''
+    const ch = astream.channels ? `${astream.channels} 声道` : ''
+    const audioParts = [codec, sr, ch].filter(x => x)
+    if (audioParts.length) items.push({ k: '音频', v: audioParts.join(' · ') })
+  }
+
+  // 流数量
+  if (streams.length) items.push({ k: '流数', v: `${streams.length}` })
+
+  return items
+})
+const metadataView = computed({
+  get() { return showRaw.value ? 'raw' : 'visual' },
+  set(v) { showRaw.value = (v === 'raw') }
+})
 function run() {
   if (!inputPath.value) return alert('请选择输入文件')
   if (!outputPath.value) return alert('请选择输出文件')
@@ -153,7 +248,61 @@ try {
 
     <v-main>
       <v-container class="pa-4" style="max-width:900px">
-        <v-card class="pa-4 mb-4">
+        <v-tabs v-model="selectedTab" class="mb-4">
+          <v-tab>信息</v-tab>
+          <v-tab>转换</v-tab>
+        </v-tabs>
+
+        <!-- 信息 Tab -->
+        <div v-if="selectedTab === 0">
+          <v-card class="pa-4 mb-4">
+            <v-row align="center">
+              <v-col cols="12" md="3"><div class="label">文件：</div></v-col>
+              <v-col cols="12" md="9">
+                <v-text-field v-model="infoFile" placeholder="选择要查询的文件..." readonly append-inner-icon="mdi-folder-open" append-outer-icon="mdi-dots-horizontal" @click:append-inner="chooseInfoFile" @click:append-outer="chooseInfoFile"/>
+              </v-col>
+            </v-row>
+
+            <v-row class="justify-end">
+              <v-btn color="primary" :loading="probing" @click="probeFile">查询元信息</v-btn>
+            </v-row>
+
+            <v-row class="mt-3">
+              <v-col cols="12">
+                <div v-if="metadata && metadata.success">
+                  <v-card class="pa-3">
+                    <v-tabs v-model="metadataView" class="mb-2" background-color="transparent" grow>
+                      <v-tab value="visual">可视化</v-tab>
+                      <v-tab value="raw">原始 JSON</v-tab>
+                    </v-tabs>
+                    <div style="font-weight:600;margin-bottom:6px">{{ showRaw ? '原始 JSON 元信息' : '元信息（可视化）' }}</div>
+                    <template v-if="!showRaw">
+                      <v-simple-table dense>
+                        <tbody>
+                          <tr v-for="(it, idx) in displayItems" :key="idx">
+                            <td style="width:36%;font-weight:600;color:var(--v-theme-on-surface);opacity:0.9">{{ it.k }}</td>
+                            <td style="color:var(--v-theme-on-surface);opacity:0.85">{{ it.v }}</td>
+                          </tr>
+                        </tbody>
+                      </v-simple-table>
+                    </template>
+                    <template v-else>
+                      <pre style="white-space:pre-wrap;word-break:break-word;font-size:12px">{{ JSON.stringify(metadata.data, null, 2) }}</pre>
+                    </template>
+                  </v-card>
+                </div>
+                <div v-else-if="metadata">
+                  <v-alert type="error">{{ metadata.error || '无法获取元信息' }}</v-alert>
+                  <pre v-if="metadata.raw">{{ metadata.raw }}</pre>
+                </div>
+              </v-col>
+            </v-row>
+          </v-card>
+        </div>
+
+        <!-- 转换 Tab -->
+        <div v-if="selectedTab === 1">
+          <v-card class="pa-4 mb-4">
           <v-row align="center">
             <v-col cols="12" md="3"><div class="label">输入文件：</div></v-col>
             <v-col cols="12" md="9">
@@ -245,6 +394,8 @@ try {
           </v-row>
         </v-card>
 
+        </div>
+
       </v-container>
     </v-main>
   </v-app>
@@ -256,4 +407,7 @@ try {
   .status-text{font-weight:500;color:var(--v-theme-on-surface)}
   .meta{color:var(--v-theme-on-surface);opacity:0.85;font-size:13px}
   .waiting{color:var(--v-theme-on-surface);opacity:0.7}
+
+  /* 信息卡优化样式 */
+  /* 信息卡旧样式已移除 */
 </style>
