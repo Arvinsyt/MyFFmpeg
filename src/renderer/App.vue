@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useTheme } from 'vuetify'
 
 const inputPath = ref('')
 const outputPath = ref('')
@@ -98,106 +99,110 @@ onMounted(() => {
     // 已移除 ETA：界面仅显示 spinner 和百分比
   })
 })
+
+// 主题控制（light / dark）
+const theme = useTheme()
+const isDark = computed(() => theme.global.name.value === 'dark')
+function toggleTheme() {
+  const name = isDark.value ? 'light' : 'dark'
+  theme.global.name.value = name
+  try { localStorage.setItem('theme', name) } catch (e) {}
+}
+
+// 初始化主题
+try {
+  const saved = localStorage.getItem('theme')
+  if (saved) theme.global.name.value = saved
+} catch (e) {}
 </script>
 
 <template>
-  <div class="app">
-    <header class="app-bar">
-      <div class="app-title">MyFFmpeg</div>
-    </header>
+  <v-app>
+    <v-app-bar color="primary" dark>
+        <v-toolbar-title>MyFFmpeg</v-toolbar-title>
+        <v-spacer></v-spacer>
+        <v-btn icon @click="toggleTheme" title="切换主题">
+          <v-icon v-if="isDark">mdi-white-balance-sunny</v-icon>
+          <v-icon v-else>mdi-weather-night</v-icon>
+        </v-btn>
+      </v-app-bar>
 
-    <main class="content">
-      <section class="card">
-        <div class="row">
-          <label class="label">输入文件：</label>
-          <div style="flex:1;display:flex;align-items:center;gap:8px">
-            <input class="input" v-model="inputPath" placeholder="选择输入文件..." readonly />
-            <button class="icon-btn" @click="chooseFile" title="选择文件">⋯</button>
-          </div>
-        </div>
+    <v-main>
+      <v-container class="pa-4" style="max-width:900px">
+        <v-card class="pa-4 mb-4">
+          <v-row align="center">
+            <v-col cols="12" md="3"><div class="label">输入文件：</div></v-col>
+            <v-col cols="12" md="9">
+              <v-text-field
+                v-model="inputPath"
+                placeholder="选择输入文件..."
+                readonly
+                append-inner-icon="mdi-folder-open"
+                append-outer-icon="mdi-dots-horizontal"
+                @click:append-inner="chooseFile"
+                @click:append-outer="chooseFile"
+                title="选择文件"
+              />
+            </v-col>
+          </v-row>
 
-        <div class="row">
-          <label class="label">输出格式：</label>
-          <select class="select" v-model="format" @change="() => { if (inputPath) { const dot = inputPath.lastIndexOf('.'); const base = dot !== -1 ? inputPath.slice(0, dot) : inputPath; outputPath = `${base}_out.${format}` } }">
-            <option value="mp4">mp4</option>
-            <option value="mp3">mp3</option>
-            <option value="mkv">mkv</option>
-          </select>
-        </div>
+          <v-row align="center">
+            <v-col cols="12" md="3"><div class="label">输出格式：</div></v-col>
+            <v-col cols="12" md="9">
+              <v-select v-model="format" :items="['mp4','mp3','mkv']" dense @change="() => { if (inputPath) { const dot = inputPath.lastIndexOf('.'); const base = dot !== -1 ? inputPath.slice(0, dot) : inputPath; outputPath = `${base}_out.${format}` } }"/>
+            </v-col>
+          </v-row>
 
-        <div class="row">
-          <label class="label">输出文件：</label>
-          <input class="input" v-model="outputPath" />
-        </div>
+          <v-row align="center">
+            <v-col cols="12" md="3"><div class="label">输出文件：</div></v-col>
+            <v-col cols="12" md="9">
+              <v-text-field v-model="outputPath"/>
+            </v-col>
+          </v-row>
 
-        <div class="row actions">
-          <button class="btn primary" @click="run" :disabled="running">开始转换</button>
-        </div>
-      </section>
+          <v-row class="justify-end">
+            <v-btn color="primary" :disabled="running" @click="run">开始转换</v-btn>
+          </v-row>
+        </v-card>
 
-      <section class="card info" v-if="running || percent !== null || frame !== null">
-        <div class="info-row">
-          <div class="label">进度</div>
-          <div class="progress-inline">
-            <template v-if="running">
-              <div class="spinner" aria-hidden="true"></div>
-              <div class="status-text" style="margin-left:8px">{{ status || '处理中...' }}</div>
-            </template>
-            <template v-else-if="percent === 100">
-              <div class="success" title="完成">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 6L9 17l-5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+        <v-card v-if="running || percent !== null || frame !== null" class="pa-3">
+          <v-row>
+            <v-col cols="12">
+              <div class="d-flex align-center">
+                <template v-if="running">
+                  <v-progress-circular indeterminate color="primary" size="20"></v-progress-circular>
+                  <div class="status-text ml-3">{{ status || '处理中...' }}</div>
+                </template>
+                <template v-else-if="percent === 100">
+                  <v-icon color="success" size="28">mdi-check-circle</v-icon>
+                  <div class="status-text ml-3">完成</div>
+                </template>
+                <template v-else>
+                  <div class="waiting">等待中...</div>
+                </template>
               </div>
-              <div class="status-text" style="margin-left:8px">完成</div>
-            </template>
-            <template v-else>
-              <div class="waiting">等待中...</div>
-            </template>
-          </div>
-        </div>
-        <div class="meta" v-if="frame || fps || totalSize || speed">
-          <span v-if="frame">帧: {{ frame }}</span>
-          <span v-if="fps"> · FPS: {{ fps.toFixed(1) }}</span>
-          <span v-if="totalSize"> · 大小: {{ humanSize(totalSize) }}{{ estFinalSize ? ' / ' + humanSize(estFinalSize) : '' }}</span>
-          <span v-if="speed"> · 速度: {{ speed.toFixed(2) }}x</span>
-        </div>
-      </section>
+              <v-progress-linear v-if="percent !== null" :value="percent" class="mt-3"></v-progress-linear>
+            </v-col>
+          </v-row>
+          <v-row class="mt-2">
+            <v-col cols="12" class="meta">
+              <span v-if="frame">帧: {{ frame }}</span>
+              <span v-if="fps"> · FPS: {{ fps.toFixed(1) }}</span>
+              <span v-if="totalSize"> · 大小: {{ humanSize(totalSize) }}{{ estFinalSize ? ' / ' + humanSize(estFinalSize) : '' }}</span>
+              <span v-if="speed"> · 速度: {{ speed.toFixed(2) }}x</span>
+            </v-col>
+          </v-row>
+        </v-card>
 
-    </main>
-  </div>
-
-    <!-- 调试日志由主进程写入 `logs/ffmpeg-debug.log`（仅记录错误） -->
+      </v-container>
+    </v-main>
+  </v-app>
 </template>
 
 <style scoped>
-  /* 应用整体与 Material 风格样式 */
-  .app{font-family:'Roboto',Arial,Helvetica,sans-serif;color:#202124;background:#f5f7fb;min-height:100vh}
-  .app-bar{background:#1a73e8;color:white;padding:14px 20px;box-shadow:0 2px 4px rgba(26,115,232,0.12)}
-  .app-title{font-size:18px;font-weight:500}
-  .content{max-width:900px;margin:18px auto;padding:0 16px}
-  .card{background:white;border-radius:8px;padding:14px;box-shadow:0 1px 3px rgba(60,64,67,0.08);margin-bottom:12px}
-  .card.info{padding:10px}
-  .row{margin:6px 0;display:flex;align-items:center}
-  /* 信息行改为上下排列：标签在上，动画/文字在下（动画与标签间隔 10px） */
-  .info-row{display:flex;flex-direction:column;align-items:flex-start}
-  .info-row .progress-inline{margin-left:0;margin-top:10px}
-  .label{width:86px;color:#5f6368;font-size:14px}
-  .input,.select{flex:1;padding:8px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px}
-  .input[readonly]{background:#fafafa;border:1px solid #e6e6e6}
-  .icon-btn{width:36px;height:36px;border-radius:6px;border:none;background:#f1f3f4;color:#202124;cursor:pointer;font-size:18px;padding:0;display:inline-flex;align-items:center;justify-content:center}
-  .icon-btn:hover{background:#e8eaed}
-  .btn{padding:8px 12px;border-radius:6px;border:none;background:#e8f0fe;color:#1a73e8;cursor:pointer;box-shadow:none}
-  .btn.primary{background:#1a73e8;color:white}
-  .btn:disabled{opacity:0.6;cursor:not-allowed}
-  .actions{align-items:center}
-  /* 进度 spinner（更紧凑） */
-  .spinner{width:18px;height:18px;border:3px solid rgba(60,64,67,0.12);border-top-color:#1a73e8;border-radius:50%;animation:spin 1s linear infinite;display:inline-block}
-  .progress-inline{display:flex;align-items:center;gap:8px}
-  .status-text{font-weight:500;color:#202124;font-size:14px}
-  /* 成功动画（绿色勾） */
-  .success{width:28px;height:28px;border-radius:50%;background:#188038;display:inline-flex;align-items:center;justify-content:center;animation:pop .36s ease-out}
-  @keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
-  .meta{margin-top:10px;color:#5f6368;font-size:13px}
-  @keyframes spin{to{transform:rotate(360deg)}}
+  /* Use Vuetify theme CSS variables so text respects light/dark themes */
+  .label{color:var(--v-theme-on-surface);opacity:0.8;font-size:14px}
+  .status-text{font-weight:500;color:var(--v-theme-on-surface)}
+  .meta{color:var(--v-theme-on-surface);opacity:0.85;font-size:13px}
+  .waiting{color:var(--v-theme-on-surface);opacity:0.7}
 </style>
