@@ -17,6 +17,24 @@ const totalSize = ref(null)
 const estFinalSize = ref(null)
 const speed = ref(null)
 
+// 编解码器选择
+const videoCodec = ref('libx264')
+const audioCodec = ref('aac')
+const videoCodecs = ref([
+  { title: '保持不变 (copy)', value: 'copy' },
+  { title: 'H.264 (libx264)', value: 'libx264' },
+  { title: 'H.265 (libx265)', value: 'libx265' },
+  { title: 'VP9 (libvpx-vp9)', value: 'libvpx-vp9' },
+  { title: 'AV1 (libaom-av1)', value: 'libaom-av1' }
+])
+const audioCodecs = ref([
+  { title: '保持不变 (copy)', value: 'copy' },
+  { title: 'AAC (aac)', value: 'aac' },
+  { title: 'MP3 (libmp3lame)', value: 'libmp3lame' },
+  { title: 'Opus (libopus)', value: 'libopus' },
+  { title: 'AC-3 (ac3)', value: 'ac3' }
+])
+
 function chooseFile() {
   if (!window.electronAPI) return
   window.electronAPI.openFile().then((p) => {
@@ -51,7 +69,13 @@ function run() {
   running.value = true
   percent.value = 0
   status.value = '正在转换...'
-  window.electronAPI.runFFmpeg({ input: inputPath.value, output: outputPath.value })
+  window.electronAPI.runFFmpeg({
+    input: inputPath.value,
+    output: outputPath.value,
+    videoCodec: videoCodec.value,
+    audioCodec: audioCodec.value,
+    format: format.value
+  })
     .catch((err) => {
       running.value = false
       status.value = `启动失败: ${err && err.message ? err.message : String(err)}`
@@ -150,6 +174,33 @@ try {
             <v-col cols="12" md="3"><div class="label">输出格式：</div></v-col>
             <v-col cols="12" md="9">
               <v-select v-model="format" :items="['mp4','mp3','mkv']" dense @change="() => { if (inputPath) { const dot = inputPath.lastIndexOf('.'); const base = dot !== -1 ? inputPath.slice(0, dot) : inputPath; outputPath = `${base}_out.${format}` } }"/>
+            </v-col>
+          </v-row>
+
+          <v-row align="center">
+            <v-col cols="12" md="3"><div class="label">视频编码：</div></v-col>
+            <v-col cols="12" md="9">
+              <v-select
+                v-model="videoCodec"
+                :items="videoCodecs"
+                item-title="title"
+                item-value="value"
+                dense
+                :disabled="format === 'mp3'"
+              />
+            </v-col>
+          </v-row>
+
+          <v-row align="center">
+            <v-col cols="12" md="3"><div class="label">音频编码：</div></v-col>
+            <v-col cols="12" md="9">
+              <v-select
+                v-model="audioCodec"
+                :items="audioCodecs"
+                item-title="title"
+                item-value="value"
+                dense
+              />
             </v-col>
           </v-row>
 

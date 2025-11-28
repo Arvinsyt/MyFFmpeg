@@ -95,7 +95,21 @@ ipcMain.handle('run-ffmpeg', (event, args) => {
 
         // 使用 ffmpeg 的 -progress 从 stdout 获取可解析的进度信息
         const baseArgs = ['-y', '-i', input].concat(args.extraArgs || [])
-        const ffmpegArgs = ['-hide_banner', '-progress', 'pipe:1', '-nostats'].concat(baseArgs).concat([output])
+
+        // 根据前端传来的参数添加编码器选项
+        const codecArgs = []
+        const fmt = args.format || ''
+        if (args.videoCodec && fmt !== 'mp3') {
+            codecArgs.push('-c:v', args.videoCodec)
+        }
+        if (args.audioCodec) {
+            codecArgs.push('-c:a', args.audioCodec)
+        }
+
+        const ffmpegArgs = ['-hide_banner', '-progress', 'pipe:1', '-nostats']
+            .concat(baseArgs)
+            .concat(codecArgs)
+            .concat([output])
 
         const ff = spawn('ffmpeg', ffmpegArgs, { windowsHide: true })
 
