@@ -10,6 +10,10 @@ const infoFile = ref('')
 const metadata = ref(null)
 const probing = ref(false)
 const showRaw = ref(false)
+// 设置对话框状态与 ffmpeg 版本信息
+const showSettings = ref(false)
+const ffmpegVersion = ref('未知')
+const loadingVersion = ref(false)
 
 // （已移除格式化摘要和流解析相关的辅助计算与函数，信息页仅显示原始 JSON）
 
@@ -177,6 +181,24 @@ function run() {
     })
 }
 
+async function fetchFFmpegVersion() {
+  if (!window.electronAPI || !window.electronAPI.getFFmpegVersion) {
+    ffmpegVersion.value = '不可用 (preload 未暴露)'
+    return
+  }
+  loadingVersion.value = true
+  try {
+    const res = await window.electronAPI.getFFmpegVersion()
+    if (res && res.success) {
+      ffmpegVersion.value = res.version || (res.raw ? res.raw.split(/\r?\n/)[0] : '未知')
+    } else {
+      ffmpegVersion.value = `获取失败: ${res && res.error ? res.error : 'unknown'}`
+    }
+  } catch (e) {
+    ffmpegVersion.value = `错误: ${e && e.message ? e.message : String(e)}`
+  } finally { loadingVersion.value = false }
+}
+
 onMounted(() => {
   if (!window.electronAPI) return
   window.electronAPI.onDone((info) => {
@@ -240,6 +262,9 @@ try {
     <v-app-bar color="primary" dark>
         <v-toolbar-title>MyFFmpeg</v-toolbar-title>
         <v-spacer></v-spacer>
+        <v-btn icon title="版本" @click="() => { showSettings = true; fetchFFmpegVersion() }">
+          <v-icon>mdi-tag</v-icon>
+        </v-btn>
         <v-btn icon @click="toggleTheme" title="切换主题">
           <v-icon v-if="isDark">mdi-white-balance-sunny</v-icon>
           <v-icon v-else>mdi-weather-night</v-icon>
@@ -247,7 +272,7 @@ try {
       </v-app-bar>
 
     <v-main>
-      <v-container class="pa-4" style="max-width:900px">
+      <v-container class="pa-4" style="max-width:760px;margin:0 auto">
         <v-tabs v-model="selectedTab" class="mb-4">
           <v-tab>信息</v-tab>
           <v-tab>转换</v-tab>
@@ -259,13 +284,15 @@ try {
             <v-row align="center">
               <v-col cols="12" md="3"><div class="label">文件：</div></v-col>
               <v-col cols="12" md="9">
-                <v-text-field v-model="infoFile" placeholder="选择要查询的文件..." readonly append-inner-icon="mdi-folder-open" append-outer-icon="mdi-dots-horizontal" @click:append-inner="chooseInfoFile" @click:append-outer="chooseInfoFile"/>
-              </v-col>
+                  <v-text-field dense v-model="infoFile" placeholder="选择要查询的文件..." readonly append-inner-icon="mdi-folder-open" append-outer-icon="mdi-dots-horizontal" @click:append-inner="chooseInfoFile" @click:append-outer="chooseInfoFile"/>
+                </v-col>
             </v-row>
 
-            <v-row class="justify-end">
-              <v-btn color="primary" :loading="probing" @click="probeFile">查询元信息</v-btn>
-            </v-row>
+              <v-row class="justify-center">
+                <v-col cols="auto">
+                  <v-btn color="primary" :loading="probing" @click="probeFile" style="min-width:180px;max-width:320px;width:240px">查询元信息</v-btn>
+                </v-col>
+              </v-row>
 
             <v-row class="mt-3">
               <v-col cols="12">
@@ -306,7 +333,7 @@ try {
           <v-row align="center">
             <v-col cols="12" md="3"><div class="label">输入文件：</div></v-col>
             <v-col cols="12" md="9">
-              <v-text-field
+              <v-text-field dense
                 v-model="inputPath"
                 placeholder="选择输入文件..."
                 readonly
@@ -360,8 +387,10 @@ try {
             </v-col>
           </v-row>
 
-          <v-row class="justify-end">
-            <v-btn color="primary" :disabled="running" @click="run">开始转换</v-btn>
+          <v-row class="justify-center">
+            <v-col cols="auto">
+              <v-btn color="primary" :disabled="running" @click="run" style="min-width:180px;max-width:320px;width:240px">开始转换</v-btn>
+            </v-col>
           </v-row>
         </v-card>
 
@@ -398,6 +427,26 @@ try {
 
       </v-container>
     </v-main>
+      <!-- 设置对话框 -->
+      <v-dialog v-model="showSettings" width="420">
+        <v-card>
+          <v-card-title>
+            设置
+            <v-spacer></v-spacer>
+          </v-card-title>
+          <v-card-text>
+            <v-row align="center">
+              <v-col cols="4" class="label">FFmpeg 版本</v-col>
+              <v-col cols="8">{{ ffmpegVersion }}</v-col>
+            </v-row>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn text @click="fetchFFmpegVersion" :loading="loadingVersion">刷新</v-btn>
+            <v-btn text @click="showSettings = false">关闭</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
   </v-app>
 </template>
 

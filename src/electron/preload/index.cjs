@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     runFFmpeg: (opts) => ipcRenderer.invoke('run-ffmpeg', opts),
     // 获取视频/音频元信息（ffprobe 输出 JSON）
     getMetadata: (filePath) => ipcRenderer.invoke('probe-video', filePath),
+    // 获取本机 ffmpeg 版本信息
+    getFFmpegVersion: () => ipcRenderer.invoke('get-ffmpeg-version'),
     // 订阅来自主进程的日志消息
     onLog: (cb) => ipcRenderer.on('ffmpeg-log', (event, data) => cb(data)),
     // 订阅进度事件 (percent, outMs, kv, duration)

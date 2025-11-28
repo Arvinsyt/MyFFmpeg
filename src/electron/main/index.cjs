@@ -68,6 +68,27 @@ ipcMain.handle('probe-video', async (event, filePath) => {
     })
 })
 
+// 获取本地 ffmpeg 版本信息（返回第一行或完整输出）
+ipcMain.handle('get-ffmpeg-version', async () => {
+    return new Promise((res) => {
+        try {
+            const p = spawn('ffmpeg', ['-version'])
+            let out = ''
+            let err = ''
+            p.stdout.on('data', (d) => { out += d.toString() })
+            p.stderr.on('data', (d) => { err += d.toString() })
+            p.on('close', (code) => {
+                if (code === 0 && out) {
+                    const first = out.split(/\r?\n/)[0] || out
+                    return res({ success: true, version: first, raw: out })
+                }
+                return res({ success: false, error: 'ffmpeg_not_found_or_failed', code, stderr: err })
+            })
+            p.on('error', (e) => res({ success: false, error: e && e.message ? e.message : String(e) }))
+        } catch (e) { res({ success: false, error: e && e.message ? e.message : String(e) }) }
+    })
+})
+
 // 通过 spawn 运行 ffmpeg，并将日志回传给渲染进程
 ipcMain.handle('run-ffmpeg', (event, args) => {
     return new Promise(async (resolve) => {
