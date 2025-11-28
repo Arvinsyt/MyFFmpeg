@@ -4,6 +4,8 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
     // 打开文件对话，返回选中文件路径或 null
     openFile: () => ipcRenderer.invoke('dialog:openFile'),
+    // 选择输出文件夹
+    openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
     // 启动 ffmpeg 任务（输入/输出等参数）
     runFFmpeg: (opts) => ipcRenderer.invoke('run-ffmpeg', opts),
     // 获取视频/音频元信息（ffprobe 输出 JSON）

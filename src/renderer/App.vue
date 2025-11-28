@@ -24,6 +24,21 @@ function chooseInfoFile() {
   })
 }
 
+function stripQuotesStr(s) {
+  if (!s) return s
+  let t = String(s).trim()
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    t = t.slice(1, -1).trim()
+  }
+  return t
+}
+
+function parseInfoFileInput() {
+  const v = stripQuotesStr(infoFile.value)
+  if (!v) return
+  infoFile.value = v
+}
+
 async function probeFile() {
   if (!infoFile.value) return alert('请选择要查询的文件')
   if (!window.electronAPI || !window.electronAPI.getMetadata) return alert('元信息功能不可用')
@@ -39,6 +54,8 @@ async function probeFile() {
 
 const inputPath = ref('')
 const outputPath = ref('')
+const outputFolder = ref('')
+const outputFilename = ref('output')
 const format = ref('mp4')
 const running = ref(false)
 const status = ref('')
@@ -75,11 +92,87 @@ function chooseFile() {
   window.electronAPI.openFile().then((p) => {
     if (p) {
       inputPath.value = p
+      // 自动设置输出文件夹为输入文件所在目录（如果未手动选择）并默认文件名
+      const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))
+      if (idx !== -1) {
+        const folder = p.slice(0, idx)
+        if (!outputFolder.value) outputFolder.value = folder
+      }
       const dot = p.lastIndexOf('.')
-      const base = dot !== -1 ? p.slice(0, dot) : p
-      outputPath.value = `${base}_out.${format.value}`
+      const baseName = dot !== -1 ? p.slice((Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1), dot) : p.slice((Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1))
+      outputFilename.value = `${baseName}_out`
     }
   })
+}
+
+function chooseOutputFolder() {
+  if (!window.electronAPI || !window.electronAPI.openDirectory) return
+  window.electronAPI.openDirectory().then((p) => {
+    if (p) outputFolder.value = p
+  })
+}
+
+function parseOutputFolderInput() {
+  // 如果用户在 outputFolder 中输入了完整路径（包含文件名和可能的扩展），将其拆分
+  let v = (outputFolder.value || '').trim()
+  if (!v) return
+
+  // 去除首尾引号（单引号或双引号），例如用户在路径周围粘贴了引号
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim()
+    outputFolder.value = v
+  }
+  // 检查最后一个路径分隔符
+  const lastSlash = Math.max(v.lastIndexOf('/'), v.lastIndexOf('\\'))
+  const lastDot = v.lastIndexOf('.')
+  if (lastDot > lastSlash) {
+    // 有扩展名部分，尝试拆分
+    const folder = v.slice(0, lastSlash === -1 ? 0 : lastSlash)
+    const fname = v.slice(lastSlash + 1, lastDot)
+    const ext = v.slice(lastDot + 1)
+    if (fname) {
+      // 如果扩展与当前 format 匹配，直接使用；否则仍拆分并保留当前 format（覆盖扩展）
+      if (ext === format.value) {
+        if (folder) outputFolder.value = folder
+        outputFilename.value = fname
+      } else {
+        if (folder) outputFolder.value = folder
+        outputFilename.value = fname
+      }
+    }
+  }
+}
+
+function normalizeOutputInputs() {
+  // 在 run 前规范化：去除首尾引号，若 outputFolder 看起来是一个包含文件名的完整路径，再次拆分
+  let v = stripQuotesStr(outputFolder.value || '')
+  if (!v) return
+  outputFolder.value = v
+  const lastSlash = Math.max(v.lastIndexOf('/'), v.lastIndexOf('\\'))
+  const lastDot = v.lastIndexOf('.')
+  if (lastDot > lastSlash) {
+    const folder = v.slice(0, lastSlash === -1 ? 0 : lastSlash)
+    const fname = v.slice(lastSlash + 1, lastDot)
+    if (fname) {
+      if (folder) outputFolder.value = folder
+      outputFilename.value = fname
+    }
+  }
+}
+
+function parseInputPathInput() {
+  const vRaw = stripQuotesStr(inputPath.value)
+  if (!vRaw) return
+  inputPath.value = vRaw
+  const p = vRaw
+  const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))
+  if (idx !== -1) {
+    const folder = p.slice(0, idx)
+    if (!outputFolder.value) outputFolder.value = folder
+    const dot = p.lastIndexOf('.')
+    const baseName = dot !== -1 ? p.slice(idx + 1, dot) : p.slice(idx + 1)
+    outputFilename.value = `${baseName}_out`
+  }
 }
 
 function humanSize(bytes) {
@@ -164,13 +257,21 @@ const metadataView = computed({
 })
 function run() {
   if (!inputPath.value) return alert('请选择输入文件')
-  if (!outputPath.value) return alert('请选择输出文件')
+  if (!outputFolder.value) return alert('请选择输出文件夹')
+  if (!outputFilename.value) return alert('请输入输出文件名')
   running.value = true
   percent.value = 0
   status.value = '正在转换...'
+  // 规范化用户输入，允许用户在左侧直接粘贴完整路径
+  normalizeOutputInputs()
+  // 组合输出路径，注意 Windows 下使用反斜杠；简单实现：若输出目录以分隔符结尾则不再添加
+  const sep = outputFolder.value.includes('/') ? '/' : '\\'
+  const folderEnds = outputFolder.value.endsWith('/') || outputFolder.value.endsWith('\\')
+  const finalOutput = `${outputFolder.value}${folderEnds ? '' : sep}${outputFilename.value}.${format.value}`
+  outputPath.value = finalOutput
   window.electronAPI.runFFmpeg({
     input: inputPath.value,
-    output: outputPath.value,
+    output: finalOutput,
     videoCodec: videoCodec.value,
     audioCodec: audioCodec.value,
     format: format.value
@@ -283,9 +384,9 @@ try {
           <v-card class="pa-4 mb-4">
             <v-row align="center">
               <v-col cols="12" md="3"><div class="label">文件：</div></v-col>
-              <v-col cols="12" md="9">
-                  <v-text-field dense v-model="infoFile" placeholder="选择要查询的文件..." readonly append-inner-icon="mdi-folder-open" append-outer-icon="mdi-dots-horizontal" @click:append-inner="chooseInfoFile" @click:append-outer="chooseInfoFile"/>
-                </v-col>
+            <v-col cols="12" md="9">
+              <v-text-field dense v-model="infoFile" placeholder="选择要查询的文件..." append-inner-icon="mdi-folder-open" append-outer-icon="mdi-dots-horizontal" @click:append-inner="chooseInfoFile" @click:append-outer="chooseInfoFile" @blur="parseInfoFileInput" @input="parseInfoFileInput"/>
+            </v-col>
             </v-row>
 
               <v-row class="justify-center">
@@ -336,11 +437,12 @@ try {
               <v-text-field dense
                 v-model="inputPath"
                 placeholder="选择输入文件..."
-                readonly
                 append-inner-icon="mdi-folder-open"
                 append-outer-icon="mdi-dots-horizontal"
                 @click:append-inner="chooseFile"
                 @click:append-outer="chooseFile"
+                @blur="parseInputPathInput"
+                @input="parseInputPathInput"
                 title="选择文件"
               />
             </v-col>
@@ -383,7 +485,17 @@ try {
           <v-row align="center">
             <v-col cols="12" md="3"><div class="label">输出文件：</div></v-col>
             <v-col cols="12" md="9">
-              <v-text-field v-model="outputPath"/>
+              <v-row>
+                <v-col cols="12" md="5">
+                  <v-text-field dense v-model="outputFolder" placeholder="选择或输入输出文件夹或完整路径..." append-inner-icon="mdi-folder-open" @click:append-inner="chooseOutputFolder" @blur="parseOutputFolderInput" @input="parseOutputFolderInput" />
+                </v-col>
+                <v-col cols="8" md="5">
+                  <v-text-field dense v-model="outputFilename" placeholder="文件名（不含后缀）" />
+                </v-col>
+                <v-col cols="4" md="2" class="d-flex align-center">
+                  <v-text-field dense readonly :value="'.' + format" />
+                </v-col>
+              </v-row>
             </v-col>
           </v-row>
 

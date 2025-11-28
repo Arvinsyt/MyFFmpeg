@@ -41,6 +41,13 @@ ipcMain.handle('dialog:openFile', async () => {
     return filePaths[0]
 })
 
+// 打开文件夹对话
+ipcMain.handle('dialog:openDirectory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    if (canceled || filePaths.length === 0) return null
+    return filePaths[0]
+})
+
 // 使用 ffprobe 获取媒体元信息（JSON）
 ipcMain.handle('probe-video', async (event, filePath) => {
     return new Promise((res) => {
