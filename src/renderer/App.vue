@@ -1,77 +1,77 @@
 <script setup>
+// 该文件为主视图组件，负责切换信息与转换标签页，并协调各个子组件和 composables。
 import { ref, computed, defineAsyncComponent } from 'vue'
-import { useTheme } from 'vuetify'
-import { computeDisplayItems } from '@/utils/format'
-import { chooseFile, chooseOutputFolder, parseOutputFolderInput, parseInputPathInput, chooseInfoFile, parseInfoFileInput } from '@/utils/app-helpers'
+import { messages as msgs } from '@/shared/constants/messages'
+import { chooseInfoFile, parseInfoFileInput } from '@/shared/utils/app-helpers'
+import { useInputControls } from '@/shared/composables/useInputControls'
+import { useOutputControls } from '@/shared/composables/useOutputControls'
+import { videoCodecs as defaultVideoCodecs, audioCodecs as defaultAudioCodecs } from '@/shared/constants/codecs'
+import { useFFmpeg } from '@/shared/composables/useFFmpeg'
+import { useProbe } from '@/shared/composables/useProbe'
+import { useFFmpegSettings } from '@/shared/composables/useFFmpegSettings'
 
 const InfoTab = defineAsyncComponent(() => import('./components/InfoTab.vue'))
 const ConvertTab = defineAsyncComponent(() => import('./components/ConvertTab.vue'))
 const ToolbarActions = defineAsyncComponent(() => import('./components/ToolbarActions.vue'))
 const SettingsDialogContent = defineAsyncComponent(() => import('./components/SettingsDialogContent.vue'))
 
-function setInfoFile(v) { infoFile.value = v }
-function setShowRaw(v) { showRaw.value = v }
-function setInputPath(v) { inputPath.value = v }
-function setOutputFolder(v) { outputFolder.value = v }
-function setOutputFilename(v) { outputFilename.value = v }
-function setFormat(v) { format.value = v }
-function setVideoCodec(v) { videoCodec.value = v }
-function setAudioCodec(v) { audioCodec.value = v }
-const chooseFileHandler = () => chooseFile(inputPath, outputFolder, outputFilename)
-const chooseOutputFolderHandler = () => chooseOutputFolder(outputFolder)
-const parseOutputFolderInputHandler = () => parseOutputFolderInput(outputFolder, outputFilename)
-const parseInputPathInputHandler = () => parseInputPathInput(inputPath, outputFolder, outputFilename)
+const { infoFile, metadata, probing, showRaw, displayItems, metadataView, probeFile, setInfoFile, setShowRaw } = useProbe()
+
+const { isDark, toggleTheme, showSettings, ffmpegVersion, loadingVersion, fetchFFmpegVersion, openSettings } = useFFmpegSettings()
+
+/**
+ * 触发选择信息文件的处理器（包装 util 函数）。
+ */
 const chooseInfoFileHandler = () => chooseInfoFile(infoFile)
+
+/**
+ * 解析信息文件输入的处理器（包装 util 函数）。
+ */
 const parseInfoFileInputHandler = () => parseInfoFileInput(infoFile)
 
 const selectedTab = ref(0)
 
-const infoFile = ref('')
-const metadata = ref(null)
-const probing = ref(false)
-const showRaw = ref(false)
-const showSettings = ref(false)
-const ffmpegVersion = ref('未知')
-const loadingVersion = ref(false)
-
- 
-
-async function probeFile() {
-  if (!infoFile.value) return alert('请选择要查询的文件')
-  if (!window.electronAPI || !window.electronAPI.getMetadata) return alert('元信息功能不可用')
-  probing.value = true
-  metadata.value = null
-  try {
-    const res = await window.electronAPI.getMetadata(infoFile.value)
-    metadata.value = res
-  } catch (e) {
-    metadata.value = { success: false, error: e && e.message ? e.message : String(e) }
-  } finally { probing.value = false }
-}
-
-const inputPath = ref('')
-const outputFolder = ref('')
-const outputFilename = ref('output')
+const { outputFolder, outputFilename, setOutputFolder, setOutputFilename, chooseOutputFolderHandler, parseOutputFolderInputHandler } = useOutputControls('', 'output')
+const { inputPath, setInputPath, chooseFileHandler, parseInputPathInputHandler } = useInputControls(outputFolder, outputFilename, '')
 const format = ref('mp4')
 
-const videoCodec = ref('libx264')
-const audioCodec = ref('aac')
-const videoCodecs = ref([
-  { title: '保持不变 (copy)', value: 'copy' },
-  { title: 'H.264 (libx264)', value: 'libx264' },
-  { title: 'H.265 (libx265)', value: 'libx265' },
-  { title: 'VP9 (libvpx-vp9)', value: 'libvpx-vp9' },
-  { title: 'AV1 (libaom-av1)', value: 'libaom-av1' }
-])
-const audioCodecs = ref([
-  { title: '保持不变 (copy)', value: 'copy' },
-  { title: 'AAC (aac)', value: 'aac' },
-  { title: 'MP3 (libmp3lame)', value: 'libmp3lame' },
-  { title: 'Opus (libopus)', value: 'libopus' },
-  { title: 'AC-3 (ac3)', value: 'ac3' }
-])
+const inputControls = {
+  inputPath,
+  setInputPath,
+  chooseFile: chooseFileHandler,
+  parseInputPathInput: parseInputPathInputHandler
+}
 
-import { useFFmpeg } from '@/composables/useFFmpeg'
+const outputControls = {
+  outputFolder,
+  outputFilename,
+  setOutputFolder,
+  setOutputFilename,
+  chooseOutputFolder: chooseOutputFolderHandler,
+  parseOutputFolderInput: parseOutputFolderInputHandler
+}
+
+const videoCodec = ref('copy')
+const audioCodec = ref('copy')
+const videoCodecs = ref(defaultVideoCodecs)
+const audioCodecs = ref(defaultAudioCodecs)
+
+
+/**
+ * 设置输出格式。
+ */
+function setFormat(v) { format.value = v }
+
+/**
+ * 设置视频编码器值（响应式）。
+ */
+function setVideoCodec(v) { videoCodec.value = v }
+
+/**
+ * 设置音频编码器值（响应式）。
+ */
+function setAudioCodec(v) { audioCodec.value = v }
+
 const { running, status, percent, frame, fps, totalSize, estFinalSize, speed, run, outputPath } = useFFmpeg({
   inputPath,
   outputFolder,
@@ -81,48 +81,6 @@ const { running, status, percent, frame, fps, totalSize, estFinalSize, speed, ru
   audioCodec,
   parseOutputFolderInputHandler
 })
-
-const displayItems = computed(() => computeDisplayItems(metadata.value))
-const metadataView = computed({
-  get() { return showRaw.value ? 'raw' : 'visual' },
-  set(v) { showRaw.value = (v === 'raw') }
-})
-
-async function fetchFFmpegVersion() {
-  if (!window.electronAPI || !window.electronAPI.getFFmpegVersion) {
-    ffmpegVersion.value = '不可用 (preload 未暴露)'
-    return
-  }
-  loadingVersion.value = true
-  try {
-    const res = await window.electronAPI.getFFmpegVersion()
-    if (res && res.success) {
-      ffmpegVersion.value = res.version || (res.raw ? res.raw.split(/\r?\n/)[0] : '未知')
-    } else {
-      ffmpegVersion.value = `获取失败: ${res && res.error ? res.error : 'unknown'}`
-    }
-  } catch (e) {
-    ffmpegVersion.value = `错误: ${e && e.message ? e.message : String(e)}`
-  } finally { loadingVersion.value = false }
-}
-
-const theme = useTheme()
-const isDark = computed(() => theme.global.name.value === 'dark')
-function toggleTheme() {
-  const name = isDark.value ? 'light' : 'dark'
-  theme.global.name.value = name
-  try { localStorage.setItem('theme', name) } catch (e) {}
-}
-
-function openSettings() {
-  showSettings.value = true
-  try { fetchFFmpegVersion() } catch (e) { }
-}
-
-try {
-  const saved = localStorage.getItem('theme')
-  if (saved) theme.global.name.value = saved
-} catch (e) {}
 </script>
 
 <template>
@@ -136,8 +94,8 @@ try {
     <v-main>
       <v-container class="pa-4" style="max-width:760px;margin:0 auto">
         <v-tabs v-model="selectedTab" class="mb-4">
-          <v-tab>信息</v-tab>
-          <v-tab>转换</v-tab>
+          <v-tab>{{ msgs.tab_info }}</v-tab>
+          <v-tab>{{ msgs.tab_convert }}</v-tab>
         </v-tabs>
 
         
@@ -158,7 +116,7 @@ try {
                   />
             </template>
             <template #fallback>
-              <v-card class="pa-4 mb-4"><div style="height:120px;display:flex;align-items:center;justify-content:center">加载中...</div></v-card>
+              <v-card class="pa-4 mb-4"><div style="height:120px;display:flex;align-items:center;justify-content:center">{{ msgs.loading }}</div></v-card>
             </template>
           </Suspense>
         </div>
@@ -168,10 +126,9 @@ try {
           <Suspense>
             <template #default>
               <ConvertTab
-                :inputPath="inputPath"
+                :inputControls="inputControls"
+                :outputControls="outputControls"
                 :outputPath="outputPath"
-                :outputFolder="outputFolder"
-                :outputFilename="outputFilename"
                 :format="format"
                 :running="running"
                 :status="status"
@@ -185,21 +142,14 @@ try {
                 :audioCodec="audioCodec"
                 :videoCodecs="videoCodecs"
                 :audioCodecs="audioCodecs"
-                :chooseFile="chooseFileHandler"
-                :chooseOutputFolder="chooseOutputFolderHandler"
-                :parseOutputFolderInput="parseOutputFolderInputHandler"
-                :parseInputPathInput="parseInputPathInputHandler"
                 :run="run"
-                :setInputPath="setInputPath"
-                :setOutputFolder="setOutputFolder"
-                :setOutputFilename="setOutputFilename"
                 :setFormat="setFormat"
                 :setVideoCodec="setVideoCodec"
                 :setAudioCodec="setAudioCodec"
               />
             </template>
             <template #fallback>
-              <v-card class="pa-4 mb-4"><div style="height:120px;display:flex;align-items:center;justify-content:center">加载中...</div></v-card>
+              <v-card class="pa-4 mb-4"><div style="height:120px;display:flex;align-items:center;justify-content:center">{{ msgs.loading }}</div></v-card>
             </template>
           </Suspense>
         </div>

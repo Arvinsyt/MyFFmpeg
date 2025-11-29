@@ -1,10 +1,13 @@
 <script setup>
-import { humanSize } from '@/utils/format'
+// 转换标签页组件：UI 表单用于配置并触发转换任务，展示进度与状态。
+import { humanSize } from '@/shared/utils/format'
+import { messages as msgs } from '@/shared/constants/messages'
+import { formats } from '@/shared/constants/formats'
+
 const props = defineProps({
-  inputPath: String,
+  inputControls: Object,
+  outputControls: Object,
   outputPath: String,
-  outputFolder: String,
-  outputFilename: String,
   format: String,
   running: Boolean,
   status: String,
@@ -18,15 +21,7 @@ const props = defineProps({
   audioCodec: String,
   videoCodecs: Array,
   audioCodecs: Array,
-  chooseFile: Function,
-  chooseOutputFolder: Function,
-  parseOutputFolderInput: Function,
-  parseInputPathInput: Function,
-  normalizeOutputInputs: Function,
   run: Function,
-  setInputPath: Function,
-  setOutputFolder: Function,
-  setOutputFilename: Function,
   setFormat: Function,
   setVideoCodec: Function,
   setAudioCodec: Function
@@ -36,50 +31,50 @@ const props = defineProps({
 <template>
   <v-card class="pa-4 mb-4">
     <v-row align="center">
-      <v-col cols="12" md="3"><div class="label">输入文件：</div></v-col>
+      <v-col cols="12" md="3"><div class="label">{{ msgs.label_input }}</div></v-col>
       <v-col cols="12" md="9">
         <v-text-field dense
-          :value="inputPath"
-          placeholder="选择输入文件..."
+          :value="props.inputControls.inputPath && props.inputControls.inputPath.value"
+          :placeholder="msgs.select_input_placeholder"
           append-inner-icon="mdi-folder-open"
           append-outer-icon="mdi-dots-horizontal"
-          @click:append-inner="chooseFile"
-          @click:append-outer="chooseFile"
-          @blur="parseInputPathInput"
-          @input="e => props.setInputPath && props.setInputPath(e)"
-          title="选择文件"
+          @click:append-inner="props.inputControls.chooseFile"
+          @click:append-outer="props.inputControls.chooseFile"
+          @blur="props.inputControls.parseInputPathInput"
+          @input="e => props.inputControls.setInputPath && props.inputControls.setInputPath(e)"
+          :title="msgs.choose_file_title"
         />
       </v-col>
     </v-row>
 
     <v-row align="center">
-      <v-col cols="12" md="3"><div class="label">输出格式：</div></v-col>
+      <v-col cols="12" md="3"><div class="label">{{ msgs.label_format }}</div></v-col>
       <v-col cols="12" md="9">
-        <v-select :model-value="format" :items="['mp4','mp3','mkv']" dense @update:model-value="val => props.setFormat && props.setFormat(val)"/>
+        <v-select :model-value="props.format" :items="formats" dense @update:model-value="val => props.setFormat && props.setFormat(val)"/>
       </v-col>
     </v-row>
 
     <v-row align="center">
-      <v-col cols="12" md="3"><div class="label">视频编码：</div></v-col>
+      <v-col cols="12" md="3"><div class="label">{{ msgs.label_video_codec }}</div></v-col>
       <v-col cols="12" md="9">
         <v-select
-          :model-value="videoCodec"
-          :items="videoCodecs"
+          :model-value="props.videoCodec"
+          :items="props.videoCodecs"
           item-title="title"
           item-value="value"
           dense
-          :disabled="format === 'mp3'"
+          :disabled="props.format === 'mp3'"
           @update:model-value="val => props.setVideoCodec && props.setVideoCodec(val)"
         />
       </v-col>
     </v-row>
 
     <v-row align="center">
-      <v-col cols="12" md="3"><div class="label">音频编码：</div></v-col>
+      <v-col cols="12" md="3"><div class="label">{{ msgs.label_audio_codec }}</div></v-col>
       <v-col cols="12" md="9">
         <v-select
-          :model-value="audioCodec"
-          :items="audioCodecs"
+          :model-value="props.audioCodec"
+          :items="props.audioCodecs"
           item-title="title"
           item-value="value"
           dense
@@ -89,25 +84,25 @@ const props = defineProps({
     </v-row>
 
     <v-row align="center">
-      <v-col cols="12" md="3"><div class="label">输出文件：</div></v-col>
+      <v-col cols="12" md="3"><div class="label">{{ msgs.label_output_file }}</div></v-col>
       <v-col cols="12" md="9">
         <v-row>
             <v-col cols="12" md="5">
-              <v-text-field dense :value="outputFolder" placeholder="选择或输入输出文件夹或完整路径..." append-inner-icon="mdi-folder-open" @click:append-inner="chooseOutputFolder" @blur="parseOutputFolderInput" @input="e => props.setOutputFolder && props.setOutputFolder(e)" />
+              <v-text-field dense :value="props.outputControls.outputFolder && props.outputControls.outputFolder.value" :placeholder="msgs.output_folder_placeholder" append-inner-icon="mdi-folder-open" @click:append-inner="props.outputControls.chooseOutputFolder" @blur="props.outputControls.parseOutputFolderInput" @input="e => props.outputControls.setOutputFolder && props.outputControls.setOutputFolder(e)" />
             </v-col>
             <v-col cols="8" md="5">
-              <v-text-field dense :value="outputFilename" placeholder="文件名（不含后缀）" @input="e => props.setOutputFilename && props.setOutputFilename(e)" />
+              <v-text-field dense :value="props.outputControls.outputFilename && props.outputControls.outputFilename.value" :placeholder="msgs.output_filename_placeholder" @input="e => props.outputControls.setOutputFilename && props.outputControls.setOutputFilename(e)" />
           </v-col>
           <v-col cols="4" md="2" class="d-flex align-center">
-            <v-text-field dense readonly :value="'.' + format" />
+            <v-text-field dense readonly :value="'.' + props.format" />
           </v-col>
         </v-row>
       </v-col>
     </v-row>
 
     <v-row class="justify-center">
-      <v-col cols="auto">
-        <v-btn color="primary" :disabled="running" @click="run" style="min-width:180px;max-width:320px;width:240px">开始转换</v-btn>
+        <v-col cols="auto">
+        <v-btn color="primary" :disabled="running" @click="run" style="min-width:180px;max-width:320px;width:240px">{{ msgs.btn_start_conversion }}</v-btn>
       </v-col>
     </v-row>
 
@@ -117,14 +112,14 @@ const props = defineProps({
           <div class="d-flex align-center">
             <template v-if="running">
               <v-progress-circular indeterminate color="primary" size="20"></v-progress-circular>
-              <div class="status-text ml-3">{{ status || '处理中...' }}</div>
+              <div class="status-text ml-3">{{ status || msgs.processing }}</div>
             </template>
             <template v-else-if="percent === 100">
               <v-icon color="success" size="28">mdi-check-circle</v-icon>
-              <div class="status-text ml-3">完成</div>
+              <div class="status-text ml-3">{{ msgs.status_completed }}</div>
             </template>
             <template v-else>
-              <div class="waiting">等待中...</div>
+              <div class="waiting">{{ msgs.status_waiting }}</div>
             </template>
           </div>
           <v-progress-linear v-if="percent !== null" :value="percent" class="mt-3"></v-progress-linear>
@@ -132,10 +127,10 @@ const props = defineProps({
       </v-row>
       <v-row class="mt-2">
         <v-col cols="12" class="meta">
-          <span v-if="frame">帧: {{ frame }}</span>
-          <span v-if="fps"> · FPS: {{ fps.toFixed(1) }}</span>
-          <span v-if="totalSize"> · 大小: {{ humanSize(totalSize) }}{{ estFinalSize ? ' / ' + humanSize(estFinalSize) : '' }}</span>
-          <span v-if="speed"> · 速度: {{ speed.toFixed(2) }}x</span>
+          <span v-if="frame">{{ msgs.meta_frame }}: {{ frame }}</span>
+          <span v-if="fps"> · {{ msgs.meta_fps }}: {{ fps.toFixed(1) }}</span>
+          <span v-if="totalSize"> · {{ msgs.meta_size }}: {{ humanSize(totalSize) }}{{ estFinalSize ? ' / ' + humanSize(estFinalSize) : '' }}</span>
+          <span v-if="speed"> · {{ msgs.meta_speed }}: {{ speed.toFixed(2) }}x</span>
         </v-col>
       </v-row>
     </v-card>

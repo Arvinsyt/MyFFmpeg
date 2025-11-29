@@ -1,6 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 
+/**
+ * 创建主窗口并配置预加载脚本与安全选项。
+ */
 function createWindow() {
     const win = new BrowserWindow({
         width: 900,
@@ -32,6 +35,9 @@ app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') app.quit()
 })
 
+/**
+ * 主进程提供的对话接口：打开文件与选择目录
+ */
 ipcMain.handle('dialog:openFile', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openFile'] })
     if (canceled || filePaths.length === 0) return null

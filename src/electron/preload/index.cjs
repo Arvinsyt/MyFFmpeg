@@ -1,5 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
+/**
+ * 预加载脚本：通过 contextBridge 向渲染进程暴露安全的 electron API。
+ * 渲染层应通过 window.electronAPI 调用这些方法与订阅事件。
+ */
 contextBridge.exposeInMainWorld('electronAPI', {
     openFile: () => ipcRenderer.invoke('dialog:openFile'),
     openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),

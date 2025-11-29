@@ -1,5 +1,14 @@
 import { ref, onMounted } from 'vue'
 
+import { runFFmpeg, onProgress, onDone, onError } from '@/shared/ipc'
+import { buildFinalOutput } from '@/shared/utils/format'
+import { validateRunInputs } from '@/shared/utils/validators'
+import { messages as msgs } from '@/shared/constants/messages'
+
+/**
+ * 提供转换任务的主要逻辑：运行 ffmpeg、监听进度/完成/错误事件并维护相关状态。
+ * 返回运行状态（running、status、percent 等）和触发 run 的方法。
+ */
 export function useFFmpeg({ inputPath, outputFolder, outputFilename, format, videoCodec, audioCodec, parseOutputFolderInputHandler } = {}) {
     const running = ref(false)
     const status = ref('')
@@ -11,24 +20,19 @@ export function useFFmpeg({ inputPath, outputFolder, outputFilename, format, vid
     const speed = ref(null)
     const outputPath = ref('')
 
+    /**
+     * 开始运行 ffmpeg 的包装方法：先验证输入、准备输出路径、调用主进程接口。
+     */
     function run() {
-        if (!inputPath || !inputPath.value) { alert('请选择输入文件'); return }
-        if (!outputFolder || !outputFolder.value) { alert('请选择输出文件夹'); return }
-        if (!outputFilename || !outputFilename.value) { alert('请输入输出文件名'); return }
+        const v = validateRunInputs(inputPath, outputFolder, outputFilename)
+        if (!v.ok) { alert(v.msg || msgs.selectInput); return }
         running.value = true
         percent.value = 0
-        status.value = '正在转换...'
+        status.value = msgs.running
         try { if (parseOutputFolderInputHandler) parseOutputFolderInputHandler() } catch (e) { }
-        const sep = outputFolder.value.includes('/') ? '/' : '\\'
-        const folderEnds = outputFolder.value.endsWith('/') || outputFolder.value.endsWith('\\')
-        const finalOutput = `${outputFolder.value}${folderEnds ? '' : sep}${outputFilename.value}.${format.value}`
+        const finalOutput = buildFinalOutput(outputFolder.value, outputFilename.value, format.value)
         outputPath.value = finalOutput
-        if (!window.electronAPI || !window.electronAPI.runFFmpeg) {
-            running.value = false
-            status.value = '运行接口不可用'
-            return
-        }
-        window.electronAPI.runFFmpeg({
+        runFFmpeg({
             input: inputPath.value,
             output: finalOutput,
             videoCodec: videoCodec.value,
@@ -36,25 +40,30 @@ export function useFFmpeg({ inputPath, outputFolder, outputFilename, format, vid
             format: format.value
         }).catch((err) => {
             running.value = false
-            status.value = `启动失败: ${err && err.message ? err.message : String(err)}`
+            status.value = `${msgs.startup_failed}${err && err.message ? err.message : String(err)}`
         })
     }
 
     onMounted(() => {
-        if (!window.electronAPI) return
-        window.electronAPI.onDone((info) => {
+        // ffmpeg 完成事件处理
+        onDone((info) => {
             running.value = false
             if (info && info.success) {
-                status.value = '转换完成'
+                status.value = msgs.done
                 percent.value = 100
             }
-            else status.value = `转换结束（代码 ${info && info.code != null ? info.code : 'unknown'}）`
+            else {
+                const codeVal = info && info.code != null ? info.code : msgs.unknown
+                status.value = msgs.finished_with_code.replace('{code}', String(codeVal))
+            }
         })
-        window.electronAPI.onError((err) => {
+        // ffmpeg 错误事件处理
+        onError((err) => {
             running.value = false
-            status.value = `错误: ${err && err.message ? err.message : JSON.stringify(err)}`
+            status.value = `${msgs.error_prefix}${err && err.message ? err.message : JSON.stringify(err)}`
         })
-        window.electronAPI.onProgress((data) => {
+        // ffmpeg 进度事件处理，解析并更新相关统计
+        onProgress((data) => {
             if (!data) return
             const kv = data.kv || {}
             if (kv.frame) frame.value = parseInt(kv.frame) || null

@@ -5,6 +5,9 @@ const logger = require(path.join(__dirname, 'ffmpeg-logger.cjs'))
 const progressParser = require(path.join(__dirname, 'ffmpeg-progress-parser.cjs'))
 const logWriterFactory = require(path.join(__dirname, 'ffmpeg-log-writer.cjs'))
 
+/**
+ * 注册 run-ffmpeg 处理器：负责调用 ffmpeg 进程，解析进度，写日志，并通过 IPC 向渲染器发送事件。
+ */
 function register(ipcMain) {
     ipcMain.handle('run-ffmpeg', (event, args) => {
         return new Promise(async (resolve) => {

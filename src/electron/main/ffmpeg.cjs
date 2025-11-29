@@ -3,6 +3,10 @@ const path = require('path')
 const fs = require('fs')
 const logger = require(path.join(__dirname, 'ffmpeg-logger.cjs'))
 
+/**
+ * 注册与 ffprobe / ffmpeg 相关的 ipc 处理器：提供媒体探测与版本查询接口。
+ * 会尝试加载并注册更复杂的运行器（ffmpeg-runner）。
+ */
 function register(ipcMain) {
     ipcMain.handle('probe-video', async (event, filePath) => {
         return new Promise((res) => {

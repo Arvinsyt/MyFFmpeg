@@ -1,5 +1,7 @@
 <script setup>
+// 信息查询页面组件：显示媒体文件的元信息（可视化或原始 JSON）。
 import { computed } from 'vue'
+import { messages as msgs } from '@/shared/constants/messages'
 const props = defineProps({
   infoFile: String,
   metadata: Object,
@@ -13,6 +15,9 @@ const props = defineProps({
   setShowRaw: Function
 })
 
+/**
+ * metadataView 计算属性：在可视化与原始 JSON 视图间切换，并通知父组件。
+ */
 const metadataView = computed({
   get() { return props.showRaw ? 'raw' : 'visual' },
   set(v) { if (props.setShowRaw) props.setShowRaw(v === 'raw') }
@@ -22,28 +27,28 @@ const metadataView = computed({
 <template>
   <v-card class="pa-4 mb-4">
     <v-row align="center">
-      <v-col cols="12" md="3"><div class="label">文件：</div></v-col>
-            <v-col cols="12" md="9">
-              <v-text-field dense :value="infoFile" placeholder="选择要查询的文件..." append-inner-icon="mdi-folder-open" append-outer-icon="mdi-dots-horizontal" @click:append-inner="chooseInfoFile" @click:append-outer="chooseInfoFile" @blur="parseInfoFileInput" @input="e => props.setInfoFile && props.setInfoFile(e)"/>
-            </v-col>
-    </v-row>
+        <v-col cols="12" md="3"><div class="label">{{ msgs.label_file }}</div></v-col>
+              <v-col cols="12" md="9">
+                <v-text-field dense :value="infoFile" :placeholder="msgs.selectInfoFile" append-inner-icon="mdi-folder-open" append-outer-icon="mdi-dots-horizontal" @click:append-inner="chooseInfoFile" @click:append-outer="chooseInfoFile" @blur="parseInfoFileInput" @input="e => props.setInfoFile && props.setInfoFile(e)"/>
+              </v-col>
+      </v-row>
 
-    <v-row class="justify-center">
-      <v-col cols="auto">
-        <v-btn color="primary" :loading="probing" @click="probeFile" style="min-width:180px;max-width:320px;width:240px">查询元信息</v-btn>
-      </v-col>
-    </v-row>
+      <v-row class="justify-center">
+        <v-col cols="auto">
+          <v-btn color="primary" :loading="probing" @click="probeFile" style="min-width:180px;max-width:320px;width:240px">{{ msgs.btn_query_metadata }}</v-btn>
+        </v-col>
+      </v-row>
 
     <v-row class="mt-3">
       <v-col cols="12">
         <div v-if="metadata && metadata.success">
           <v-card class="pa-3">
             <v-tabs v-model="metadataView" class="mb-2" background-color="transparent" grow>
-              <v-tab value="visual">可视化</v-tab>
-              <v-tab value="raw">原始 JSON</v-tab>
+              <v-tab value="visual">{{ msgs.metadata_tab_visual }}</v-tab>
+              <v-tab value="raw">{{ msgs.metadata_tab_raw }}</v-tab>
             </v-tabs>
-            <div style="font-weight:600;margin-bottom:6px">{{ showRaw && showRaw.value ? '原始 JSON 元信息' : '元信息（可视化）' }}</div>
-            <template v-if="!(showRaw && showRaw.value)">
+                <div style="font-weight:600;margin-bottom:6px">{{ metadataView === 'raw' ? msgs.metadata_tab_raw : msgs.metadata_tab_visual }}</div>
+              <template v-if="metadataView !== 'raw'">
               <v-simple-table dense>
                 <tbody>
                   <tr v-for="(it, idx) in displayItems" :key="idx">
@@ -59,7 +64,7 @@ const metadataView = computed({
           </v-card>
         </div>
         <div v-else-if="metadata">
-          <v-alert type="error">{{ metadata.error || '无法获取元信息' }}</v-alert>
+          <v-alert type="error">{{ metadata.error || msgs.unable_get_metadata }}</v-alert>
           <pre v-if="metadata.raw">{{ metadata.raw }}</pre>
         </div>
       </v-col>

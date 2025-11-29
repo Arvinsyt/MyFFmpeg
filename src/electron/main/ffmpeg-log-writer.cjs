@@ -2,6 +2,9 @@ const path = require('path')
 const fs = require('fs')
 const logger = require(path.join(__dirname, 'ffmpeg-logger.cjs'))
 
+/**
+ * 创建一个调试日志写入器工厂，返回具有写错误行、写调试信息、写错误缓冲和结束流的方法。
+ */
 function createLogWriter() {
     let logStream = null
 

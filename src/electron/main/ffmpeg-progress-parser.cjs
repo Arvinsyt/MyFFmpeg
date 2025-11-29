@@ -1,3 +1,9 @@
+/**
+ * 解析 ffmpeg 通过 -progress 输出的片段文本，返回键值对和剩余缓冲。
+ * @param {string} buffered - 上次未完整解析的缓冲文本
+ * @param {string} chunk - 新的文本片段
+ * @param {number|null} duration - 总时长（秒），用于计算百分比
+ */
 function parseProgressChunk(buffered, chunk, duration) {
     const text = (buffered || '') + String(chunk || '')
     const lines = text.split(/\r?\n/)

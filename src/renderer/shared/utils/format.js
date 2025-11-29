@@ -1,3 +1,8 @@
+/**
+ * 去除字符串两端的引号（单引号或双引号），并去掉首尾空白。
+ * @param {string} s
+ * @returns {string}
+ */
 export function stripQuotesStr(s) {
     if (!s) return s
     let t = String(s).trim()
@@ -7,6 +12,12 @@ export function stripQuotesStr(s) {
     return t
 }
 
+/**
+ * 将路径拆分为文件夹、基本名、文件名、扩展名等信息。
+ * 支持 Windows 和 POSIX 路径分隔符。
+ * @param {string} full
+ * @returns {{folder:string,base:string,name:string,ext:string,hasExt:boolean}}
+ */
 export function splitPath(full) {
     const v = String(full || '')
     const lastSlash = Math.max(v.lastIndexOf('/'), v.lastIndexOf('\\'))
@@ -30,6 +41,10 @@ export function splitPath(full) {
     }
 }
 
+/**
+ * 根据输出文件夹、文件名和格式构建最终的输出路径。
+ * 自动处理路径分隔符和是否需要插入分隔符。
+ */
 export function buildFinalOutput(folder, filename, fmt) {
     if (!folder) return `${filename}.${fmt}`
     const sep = folder.includes('/') ? '/' : '\\'
@@ -37,6 +52,11 @@ export function buildFinalOutput(folder, filename, fmt) {
     return `${folder}${folderEnds ? '' : sep}${filename}.${fmt}`
 }
 
+/**
+ * 将字节数格式化为可读字符串（KB/MB/GB）。
+ * @param {number} bytes
+ * @returns {string}
+ */
 export function humanSize(bytes) {
     if (bytes == null) return ''
     const b = Number(bytes)
@@ -53,6 +73,11 @@ export function humanSize(bytes) {
     return val.toFixed(2) + ' ' + units[i]
 }
 
+/**
+ * 将秒数转换为可读的时分秒文本，例如 1h 2m 3s 或 2m 5s 或 10s。
+ * @param {number} sec
+ * @returns {string}
+ */
 export function secsToHMS(sec) {
     if (sec == null || isNaN(Number(sec))) return ''
     const s = Math.floor(Number(sec))
@@ -64,6 +89,14 @@ export function secsToHMS(sec) {
     return `${ss}s`
 }
 
+import { messages as msgs } from '@/shared/constants/messages'
+
+/**
+ * 根据 ffprobe 返回的元信息构建用于界面显示的键值数组。
+ * 返回的每项为 {k: label, v: value}，用于信息卡显示。
+ * @param {object} metadata - ffprobe 返回的元信息对象
+ * @returns {Array<{k:string,v:string}>}
+ */
 export function computeDisplayItems(metadata) {
     if (!metadata || !metadata.success || !metadata.data) return []
     const d = metadata.data || {}
@@ -72,16 +105,16 @@ export function computeDisplayItems(metadata) {
 
     const items = []
 
-    if (fmt.format_name) items.push({ k: '格式', v: String(fmt.format_name) })
-    if (fmt.duration) items.push({ k: '时长', v: secsToHMS(fmt.duration) })
-    if (fmt.size) items.push({ k: '文件大小', v: humanSize(fmt.size) })
+    if (fmt.format_name) items.push({ k: msgs.format_label_format, v: String(fmt.format_name) })
+    if (fmt.duration) items.push({ k: msgs.format_duration, v: secsToHMS(fmt.duration) })
+    if (fmt.size) items.push({ k: msgs.format_file_size, v: humanSize(fmt.size) })
     if (fmt.bit_rate) {
         const kb = Math.round(Number(fmt.bit_rate) / 1000)
-        items.push({ k: '总比特率', v: `${kb} kb/s` })
+        items.push({ k: msgs.format_bitrate, v: `${kb} kb/s` })
     }
     const tags = fmt.tags || {}
-    if (tags.title) items.push({ k: '标题', v: tags.title })
-    if (tags.artist) items.push({ k: '作者', v: tags.artist })
+    if (tags.title) items.push({ k: msgs.tag_title, v: tags.title })
+    if (tags.artist) items.push({ k: msgs.tag_artist, v: tags.artist })
 
     const vstream = streams.find(s => s.codec_type === 'video')
     if (vstream) {
@@ -92,19 +125,19 @@ export function computeDisplayItems(metadata) {
         })() : null
         const fpsText = fps ? `${Number(fps).toFixed(2)} fps` : ''
         const videoParts = [codec, res, fpsText].filter(x => x)
-        if (videoParts.length) items.push({ k: '视频', v: videoParts.join(' · ') })
+        if (videoParts.length) items.push({ k: msgs.video_label, v: videoParts.join(' · ') })
     }
 
     const astream = streams.find(s => s.codec_type === 'audio')
     if (astream) {
         const codec = astream.codec_name || ''
         const sr = astream.sample_rate ? `${astream.sample_rate} Hz` : ''
-        const ch = astream.channels ? `${astream.channels} 声道` : ''
+        const ch = astream.channels ? `${astream.channels}${msgs.channels_suffix}` : ''
         const audioParts = [codec, sr, ch].filter(x => x)
-        if (audioParts.length) items.push({ k: '音频', v: audioParts.join(' · ') })
+        if (audioParts.length) items.push({ k: msgs.audio_label, v: audioParts.join(' · ') })
     }
 
-    if (streams.length) items.push({ k: '流数', v: `${streams.length}` })
+    if (streams.length) items.push({ k: msgs.streams_label, v: `${streams.length}` })
 
     return items
 }

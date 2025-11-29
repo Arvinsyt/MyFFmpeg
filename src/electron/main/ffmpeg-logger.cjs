@@ -1,6 +1,9 @@
 const path = require('path')
 const fs = require('fs')
 
+/**
+ * 确保日志目录存在并返回路径，如失败返回 null。
+ */
 function ensureLogsDir() {
     try {
         const logsDir = path.join(__dirname, '..', '..', '..', 'logs')
@@ -11,6 +14,10 @@ function ensureLogsDir() {
     }
 }
 
+/**
+ * 打开用于某次运行的日志写入流（追加模式）。
+ * 返回一个 writable stream 或 null。
+ */
 function openRunLog(runId, meta) {
     const logsDir = ensureLogsDir()
     if (!logsDir) return null
@@ -23,6 +30,9 @@ function openRunLog(runId, meta) {
     } catch (e) { return null }
 }
 
+/**
+ * 向运行日志写入一条标准化 JSON 条目。
+ */
 function writeRunLog(s, level, msg, data) {
     if (!s) return
     try {

@@ -6,6 +6,10 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import '@mdi/font/css/materialdesignicons.css'
 
+/**
+ * 渲染进程入口：创建 Vue 应用并绑定 Vuetify 插件。
+ * 该文件负责应用根组件的挂载与主题设置初始化。
+ */
 const vuetify = createVuetify({
     components,
     directives,
