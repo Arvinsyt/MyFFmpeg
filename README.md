@@ -1,36 +1,66 @@
 # MyFFmpeg
-一个基于 Electron + Vite 的桌面多媒体转换工具前端骨架，便于使用 FFmpeg 执行音视频转码、封装和简单编辑任务。
 
+**简介**
+- *MyFFmpeg*：一个基于 Electron + Vite + Vue 3 的桌面 GUI，封装并可视化调用 `ffmpeg`，用于媒体文件的转码、探测和进度显示。
+- *主要目标*：提供可配置的转换流程、实时进度日志和友好的图形界面，适合需要本地批量/单文件转换的用户。
 
-#### **主要特性**
-- [x] **Electron + Vite**: 使用 Electron 作为桌面容器、Vite 做前端构建，快速热重载开发流程。
-- [x] **易扩展的架构**: 将 Electron 主进程、Preload 脚本和渲染进程分离，便于后续增加 API、权限控制或插件系统。
-- [ ] **进度与日志**: 实时显示转换进度、输出日志与错误信息，便于调试与用户反馈。
-- [ ] **内置 FFmpeg 二进制管理**：提供自动下载或内置 FFmpeg 二进制，简化用户配置。
-- [ ] **任务队列**: 支持将多个文件加入转换队列（可扩展为并发/串行执行）。
-- [ ] **GUI 改进**：进度条更细化、批量重命名、元数据编辑、剪辑与合并功能。
-- [ ] **预设与配置模板**：添加常用转码预设（例如 H.264、H.265、MP3、AAC）与自定义配置管理。
-- [ ] **任务持久化**：保存队列、任务历史与用户偏好，支持恢复未完成任务。
-- [ ] **并发与资源控制**：支持多任务并发、CPU/GPU 加速选择与优先级控制。
-- [ ] **跨平台**: 目标支持 Windows、macOS 和 Linux（运行时依赖系统上的 FFmpeg）。
+**主要特性**
+- 可视化 FFmpeg 转换流程与进度。
+- 转换日志记录与解析（可查看并保存日志）。
+- 支持查看（probe）输入文件信息。
+- 可配置输出格式、编码器等设置（通过设置面板）。
 
-#### **快速开始（开发）**
-在项目根目录下运行（Windows PowerShell）：
+**快速开始（开发）**
+1. 安装依赖：
 ```powershell
 npm install
+```
+2. 启动开发环境（同时启动 Vite 和 Electron）：
+```powershell
 npm run dev
 ```
-- **常见命令**:
-  - `npm run dev`：启动开发模式（Vite + Electron 热重载，视项目脚本而定）。
-  - `npm run build`：构建生产包（根据项目配置可能需要额外的打包脚本）。
 
+**项目结构（优化视图）**
+```
+src/
+├─ electron/
+│  ├─ main/
+│  │  ├─ index.cjs                # Electron 主进程入口，窗口与生命周期管理、IPC
+│  │  ├─ ffmpeg.cjs               # 构建与封装 FFmpeg 命令、参数
+│  │  ├─ ffmpeg-runner.cjs        # 启动并管理 ffmpeg 子进程（任务队列/取消/重试）
+│  │  ├─ ffmpeg-progress-parser.cjs # 解析 ffmpeg 输出，提取进度与状态
+│  │  ├─ ffmpeg-logger.cjs        # 日志格式化与实时输出
+│  │  └─ ffmpeg-log-writer.cjs    # 日志持久化（写入文件）
+│  └─ preload/
+│     └─ index.cjs                # 安全桥（contextBridge），向渲染器暴露受限 API
+├─ renderer/
+│  ├─ main.js                     # 渲染器入口（Vite 挂载）
+│  ├─ App.vue                     # 根组件
+│  ├─ components/
+│  │  ├─ ConvertTab.vue           # 转码/任务管理视图
+│  │  ├─ InfoTab.vue              # 媒体信息（probe）视图
+│  │  ├─ SettingsDialogContent.vue# 设置面板
+│  │  └─ ToolbarActions.vue       # 工具栏动作
+│  └─ shared/
+│     ├─ composables/
+│     │  ├─ useFFmpeg.js          # 转码相关组合函数（命令、状态、控制）
+│     │  └─ useProbe.js           # probe/文件信息组合函数
+│     ├─ ipc/
+│     │  └─ index.js              # 封装对 preload 暴露的 `electronAPI` 的调用
+│     ├─ constants/
+│     │  ├─ codecs.js             # 支持/推荐的编码器配置
+│     │  ├─ formats.js            # 支持的输出/容器格式列表
+│     │  └─ messages.js           # UI / IPC 使用的消息常量
+│     └─ utils/
+│        ├─ app-helpers.js        # Electron / 渲染器辅助函数
+│        ├─ format.js             # 输出格式化（时间、大小等）
+│        ├─ storage.js            # 本地存储封装（localStorage / json 文件）
+│        ├─ theme.js              # 主题与样式相关帮助函数
+│        └─ validators.js         # 输入/文件/参数校验函数
+```
 
-#### **项目结构（关键文件）**
-- `src/electron/main/index.cjs`：Electron 主进程入口，管理窗口与原生集成。
-- `src/preload/index.cjs`：Preload 脚本，安全地在渲染进程暴露受限 API。
-- `src/renderer/App.vue`：前端应用主组件。
-- `package.json`：项目脚本与依赖声明。
-
-
-#### **说明（个人项目）**：
-本项目为个人学习/演示用途，非商业产品。源码仅供参考，使用 FFmpeg 时请遵守其许可协议及相关法律法规。
+**学习项目声明**
+本仓库为个人学习与实验性项目，目的是用于掌握 Electron + Vite + Vue 3 与 FFmpeg 集成相关的开发技术，不代表生产就绪的软件。
+- 引用：若在公开场合引用或基于本项目开发，请保留相应说明与作者信息。  
+- 责任声明：本项目按“原样”提供，不承担因使用或依赖本项目产生的任何直接或间接责任或损失。  
+- 第三方许可：项目依赖 ffmpeg 等第三方工具，使用时需遵守其各自授权与使用条款。  
